@@ -4,6 +4,7 @@ import os.path as osp
 
 import numpy as np
 import sys
+from collections import OrderedDict
 import torch
 from torch import nn
 from torch.backends import cudnn
@@ -86,7 +87,7 @@ def main(args):
         'num_instances should divide batch_size'
     if args.height is None or args.width is None:
         args.height, args.width = (144, 56) if args.arch == 'inception' else \
-                                  (256, 128)
+            (256, 128)
     dataset, num_classes, train_loader, val_loader, test_loader = \
         get_data(args.dataset, args.split, args.data_dir, args.height,
                  args.width, args.batch_size, args.num_instances, args.workers,
@@ -102,7 +103,12 @@ def main(args):
     start_epoch = best_top1 = 0
     if args.resume:
         checkpoint = load_checkpoint(args.resume)
-        model.load_state_dict(checkpoint['state_dict'])
+        new_state_dict = OrderedDict()
+        for k, v in checkpoint['state_dict'].items():
+            name = k[7:]    # remote 'module.'
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict)
+
         start_epoch = checkpoint['epoch']
         best_top1 = checkpoint['best_top1']
         print("=> Start epoch {}  best top1 {:.1%}"
@@ -165,7 +171,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Softmax loss classification")
+    parser = argparse.ArgumentParser(description="Triplet loss classification")
     # data
     parser.add_argument('-d', '--dataset', type=str, default='cuhk03',
                         choices=datasets.names())
