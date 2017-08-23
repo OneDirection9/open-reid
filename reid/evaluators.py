@@ -47,8 +47,8 @@ def pairwise_distance(features, query=None, gallery=None, metric=None):
         x = x.view(n, -1)
         if metric is not None:
             x = metric.transform(x)
-        dist = torch.pow(x, 2).sum(1) * 2
-        dist = dist.expand(n, n) - 2 * torch.mm(x, x.t())
+        pow2 = torch.pow(x, 2).sum(1)
+        dist = pow2.expand(n, n) + pow2.t().expand(n, n) - 2 * torch.mm(x, x.t())
         return dist
 
     x = torch.cat([features[f].unsqueeze(0) for f, _, _ in query], 0)
