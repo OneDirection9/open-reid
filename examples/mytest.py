@@ -132,7 +132,7 @@ def main(args):
         img_dir = ""
         metric.train(model, train_loader)
         print("Test:")
-        dist = evaluator.bbox_evaluate(model, img_dir, metric)
+        dist = evaluator.bbox_evaluate(img_dir, metric)
         print(dist)
         return
 
