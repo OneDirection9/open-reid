@@ -1,7 +1,11 @@
 from __future__ import print_function, absolute_import
+import os
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import numpy as np
+
 import time
 from collections import OrderedDict
-
 import torch
 
 from .evaluation_metrics import cmc, mean_ap
@@ -36,6 +40,28 @@ def extract_features(model, data_loader, print_freq=1, metric=None):
                   .format(i + 1, len(data_loader),
                           batch_time.val, batch_time.avg,
                           data_time.val, data_time.avg))
+
+    return features, labels
+
+
+def extract_bbox_features(model, img_dir, print_freq=1):
+    model.eval()
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+
+    features = OrderedDict()
+    labels = OrderedDict()
+
+    imgs = os.listdir(img_dir)
+    sorted(imgs)
+    end = time.time()
+    for i, img in enumerate(imgs):
+        data_time.update(time.time() - end)
+
+        img_file = os.path.join(img_dir, img)
+        img_ = plt.imread(img_file)
+        output = extract_cnn_feature(model, img_)
+        features[i] = output
 
     return features, labels
 
@@ -118,3 +144,8 @@ class Evaluator(object):
         features, _ = extract_features(self.model, data_loader)
         distmat = pairwise_distance(features, query, gallery, metric=metric)
         return evaluate_all(distmat, query=query, gallery=gallery)
+
+    def bbox_evaluate(self, img_dir, metric=None):
+        features, _ = extract_bbox_features(self.model, img_dir)
+        distmat = pairwise_distance(features, None, None, metric=metric)
+        return distmat
