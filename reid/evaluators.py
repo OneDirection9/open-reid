@@ -53,9 +53,12 @@ def extract_bbox_features(model, data_loader, print_freq=1):
     labels = OrderedDict()
 
     end = time.time()
-    for i, (imgs, file_name) in enumerate(data_loader):
-        print("{},{}".format(i, file_name))
-        features[i] = extract_cnn_feature(model, imgs)
+    for i, (imgs, file_names) in enumerate(data_loader):
+        data_time.update(time.time() - end)
+        
+        outputs = extract_cnn_feature(model, imgs)
+        for file_name, output in zip(file_names, outputs):
+            features[file_name] = output
 
     return features, labels
 

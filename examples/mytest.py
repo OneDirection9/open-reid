@@ -151,7 +151,7 @@ def main(args):
     # Evaluator
     evaluator = Evaluator(model)
     if args.evaluate:
-        img_dir = "/home/jinsheng/PoseTrack/data/bonn-multiperson-posetrack/detections_img/000001"
+        img_dir = "/home/jinsheng/PoseTrack/data/bonn-multiperson-posetrack/detections_img_unresized/000001"
         metric.train(model, train_loader)
         print("Test:")
         test_loader = bbox_data(img_dir, args.height, args.width, args.batch_size, args.workers)
