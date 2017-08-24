@@ -11,11 +11,13 @@ import torch.utils.data as data
 
 from PIL import Image
 
+def key(x):
+    return int(os.path.splitext(x)[0])
 
 class PoseDetectionFolder(data.Dataset):
     def __init__(self, img_dir, input_transform=None, target_transform=None):
         super(PoseDetectionFolder, self).__init__()
-        self.img_filenames = [os.path.join(img_dir, fname) for fname in sorted(os.listdir(img_dir))]
+        self.img_filenames = [os.path.join(img_dir, fname) for fname in sorted(os.listdir(img_dir), key=key)]
         self.input_transform = input_transform
         self.target_transform = target_transform
 
