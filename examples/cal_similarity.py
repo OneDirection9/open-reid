@@ -100,10 +100,9 @@ def main(args):
     # Evaluator
     evaluator = Evaluator(model)
     if args.evaluate:
-        metric.train(model, train_loader)
         print("Test:")
         data_dir = args.data_dir
-
+        num_dirs = len(os.listdir(data_dir))
         for i, dir_name in enumerate(os.listdir(data_dir)):
             start_time = time.time()
             img_dir = os.path.join(data_dir, dir_name)
@@ -111,7 +110,7 @@ def main(args):
                 continue
 
             test_loader = bbox_data(img_dir, args.height, args.width, args.batch_size, args.workers)
-            dist = evaluator.bbox_evaluate(test_loader, metric, args.use_cos)
+            dist = evaluator.bbox_evaluate(test_loader, args.use_cos, metric)
             dist = to_numpy(dist)
 
             save_file = os.path.join(args.save_dir, dir_name)
@@ -120,7 +119,7 @@ def main(args):
             print('Calculate: {} [{}/{}].\t'
                   'Shape: {} * {}\t'
                   'Time: {}'
-                  .format(dir_name, i + 1, *dist.shape, end_time - start_time))
+                  .format(dir_name, i + 1, num_dirs, *dist.shape, end_time - start_time))
         return
 
 
