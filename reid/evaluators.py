@@ -53,7 +53,10 @@ def extract_bbox_features(model, imgs, print_freq=1):
     labels = OrderedDict()
 
     end = time.time()
-    features = extract_cnn_feature(model, imgs)
+    features_ = extract_cnn_feature(model, imgs)
+    
+    for i, f in enumerate(features_):
+        features[i] = f
 
     return features, labels
 
