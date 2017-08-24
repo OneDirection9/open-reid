@@ -33,6 +33,8 @@ from reid.utils.data.sampler import RandomIdentitySampler
 from reid.utils.logging import Logger
 from reid.utils.serialization import load_checkpoint, save_checkpoint
 
+from pose_detection_folder import PoseDetectionFolder
+
 
 def get_data(name, split_id, data_dir, height, width, batch_size, num_instances,
              workers, combine_trainval):
@@ -82,7 +84,7 @@ def get_data(name, split_id, data_dir, height, width, batch_size, num_instances,
     return dataset, num_classes, train_loader, val_loader, test_loader
 
 
-def bbox_data(data_dir, height, width):
+def bbox_data(data_dir, height, width, batch_size, workers):
     normalizer = T.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225])
 
@@ -92,25 +94,10 @@ def bbox_data(data_dir, height, width):
         normalizer,
     ])
 
-    img_files = os.listdir(data_dir)
-    sorted(img_files)
-    imgs = np.array([])
-    for i, img_file in enumerate(img_files):
-        print(img_file)
-        img_file = osp.join(data_dir, img_file)
-        # img = test_transformer(plt.imread(img_file))
-        img = test_transformer(Image.open(img_file))
-        print(img.numpy())
-        imgs = np.append(imgs, img.numpy())
+    test_loader = DataLoader(PoseDetectionFolder(data_dir, input_transform=test_transformer), batch_size=batch_size,
+                             num_workers=workers, shuffle=False, pin_memory=True)
 
-    imgs = imgs.reshape(-1, 3, height, width)
-    print("1.jpg")
-    print(imgs[0])
-    print("2.jpg")
-    print(imgs[1])
-    print("3.jpg")
-    print(imgs[2])
-    return imgs
+    return test_loader
 
 
 def main(args):
@@ -167,8 +154,8 @@ def main(args):
         img_dir = "/home/jinsheng/PoseTrack/data/bonn-multiperson-posetrack/detections_img/000001"
         metric.train(model, train_loader)
         print("Test:")
-        imgs = bbox_data(img_dir, args.height, args.width)
-        dist = evaluator.bbox_evaluate(imgs, metric)
+        test_loader = bbox_data(img_dir, args.height, args.width, args.batch_size, args.workers)
+        dist = evaluator.bbox_evaluate(test_loader, metric)
         print(dist)
         # evaluator.evaluate(test_loader, dataset.query, dataset.gallery, metric)
         return

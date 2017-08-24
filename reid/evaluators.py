@@ -44,7 +44,7 @@ def extract_features(model, data_loader, print_freq=1, metric=None):
     return features, labels
 
 
-def extract_bbox_features(model, imgs, print_freq=1):
+def extract_bbox_features(model, data_loader, print_freq=1):
     model.eval()
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -53,10 +53,9 @@ def extract_bbox_features(model, imgs, print_freq=1):
     labels = OrderedDict()
 
     end = time.time()
-    features_ = extract_cnn_feature(model, imgs)
-    
-    for i, f in enumerate(features_):
-        features[i] = f
+    for i, (imgs, file_name) in enumerate(data_loader):
+        print("{},{}".format(i, file_name))
+        features[i] = extract_cnn_feature(model, imgs)
 
     return features, labels
 
@@ -140,7 +139,7 @@ class Evaluator(object):
         distmat = pairwise_distance(features, query, gallery, metric=metric)
         return evaluate_all(distmat, query=query, gallery=gallery)
 
-    def bbox_evaluate(self, imgs, metric=None):
-        features, _ = extract_bbox_features(self.model, imgs)
+    def bbox_evaluate(self, data_loader, metric=None):
+        features, _ = extract_bbox_features(self.model, data_loader)
         distmat = pairwise_distance(features, None, None, metric=metric)
         return distmat
