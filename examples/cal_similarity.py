@@ -116,9 +116,9 @@ def main(args):
             save_file = os.path.join(args.save_dir, dir_name)
             scio.savemat(save_file, {'diff': dist})
             end_time = time.time()
-            print('Calculate: {} [{}/{}].\t'
-                  'Shape: {} * {}\t'
-                  'Time: {}'
+            print('Calculate: {:10} [{:4}/{:<4}].\t'
+                  'Shape: {:<4} * {:4}\t'
+                  'Time: {:.3f}'
                   .format(dir_name, i + 1, num_dirs, *dist.shape, end_time - start_time))
         return
 
