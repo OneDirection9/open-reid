@@ -1,7 +1,6 @@
 from __future__ import print_function, absolute_import
 import os
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 import numpy as np
 
 import time
@@ -29,7 +28,6 @@ def extract_features(model, data_loader, print_freq=1, metric=None):
         for fname, output, pid in zip(fnames, outputs, pids):
             features[fname] = output
             labels[fname] = pid
-
         batch_time.update(time.time() - end)
         end = time.time()
 
@@ -50,15 +48,32 @@ def extract_bbox_features(model, data_loader, print_freq=1):
     data_time = AverageMeter()
 
     features = OrderedDict()
-    labels = OrderedDict()
+    labels = OrderedDict()  # not used yet
 
     end = time.time()
     for i, (imgs, file_names) in enumerate(data_loader):
         data_time.update(time.time() - end)
-        
+
+        # # save imgs after transform
+        # for img, file_name in zip(imgs, file_names):
+        #     npimg = img.numpy() * 255
+        #     npimg = npimg.astype('uint8')
+        #     imgn = np.transpose(npimg, (1, 2, 0))
+        #     plt.imsave('', imgn)
+
         outputs = extract_cnn_feature(model, imgs)
         for file_name, output in zip(file_names, outputs):
             features[file_name] = output
+        batch_time.update(time.time() - end)
+        end = time.time()
+
+        # if (i + 1) % print_freq == 0:
+        #     print('Extract Features: [{}/{}]\t'
+        #           'Time {:.3f} ({:.3f})\t'
+        #           'Data {:.3f} ({:.3f})\t'
+        #           .format(i + 1, len(data_loader),
+        #                   batch_time.val, batch_time.avg,
+        #                   data_time.val, data_time.avg))
 
     return features, labels
 
@@ -87,6 +102,27 @@ def pairwise_distance(features, query=None, gallery=None, metric=None):
     dist.addmm_(1, -2, x, y.t())
     return dist
 
+
+def probability(features):
+    n = len(features)
+
+    x = torch.cat(list(features.values()))
+    x = x.view(n, -1)
+    # |a| * |b|, vector with size n * n
+    vector_len = torch.pow(x, 2).sum(1).sqrt()
+    vector = torch.mm(vector_len, vector_len.t())
+    # vector multiplication: a . b
+    # vector_m with size n * n
+    vector_m = torch.mm(x, x.t())
+    # cos, range: [-1, 1]
+    cos = vector_m / vector
+    # (cos + 1) / 2, convert range in [0, 1]
+    cos_ = (cos + 1) / 2
+    # convert range to (0, 1)
+    cos_[cos_ >= 1] = 1 - 1e-5
+    cos_[cos_ <= 0] = 0 + 1e-5
+
+    return cos_
 
 def evaluate_all(distmat, query=None, gallery=None,
                  query_ids=None, gallery_ids=None,
@@ -142,7 +178,10 @@ class Evaluator(object):
         distmat = pairwise_distance(features, query, gallery, metric=metric)
         return evaluate_all(distmat, query=query, gallery=gallery)
 
-    def bbox_evaluate(self, data_loader, metric=None):
+    def bbox_evaluate(self, data_loader, use_cos, metric=None):
         features, _ = extract_bbox_features(self.model, data_loader)
-        distmat = pairwise_distance(features, None, None, metric=metric)
+        if use_cos == 'y':
+            distmat = probability(features)
+        else:
+            distmat = pairwise_distance(features, None, None, metric=metric)
         return distmat
