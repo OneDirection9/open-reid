@@ -8,10 +8,12 @@
 from __future__ import print_function, absolute_import
 import argparse
 import os
-from PIL import Image
 import os.path as osp
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from PIL import Image
+import time
+import scipy.io as scio
 
 import numpy as np
 import sys
@@ -36,55 +38,7 @@ from reid.utils.serialization import load_checkpoint, save_checkpoint
 from pose_detection_folder import PoseDetectionFolder
 
 
-def get_data(name, split_id, data_dir, height, width, batch_size, num_instances,
-             workers, combine_trainval):
-    root = osp.join(data_dir, name)
-
-    dataset = datasets.create(name, root, split_id=split_id)
-
-    normalizer = T.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
-
-    train_set = dataset.trainval if combine_trainval else dataset.train
-    num_classes = (dataset.num_trainval_ids if combine_trainval
-                   else dataset.num_train_ids)
-
-    train_transformer = T.Compose([
-        T.RandomSizedRectCrop(height, width),
-        T.RandomHorizontalFlip(),
-        T.ToTensor(),
-        normalizer,
-    ])
-
-    test_transformer = T.Compose([
-        T.RectScale(height, width),
-        T.ToTensor(),
-        normalizer,
-    ])
-
-    train_loader = DataLoader(
-        Preprocessor(train_set, root=dataset.images_dir,
-                     transform=train_transformer),
-        batch_size=batch_size, num_workers=workers,
-        sampler=RandomIdentitySampler(train_set, num_instances),
-        pin_memory=True, drop_last=True)
-
-    val_loader = DataLoader(
-        Preprocessor(dataset.val, root=dataset.images_dir,
-                     transform=test_transformer),
-        batch_size=batch_size, num_workers=workers,
-        shuffle=False, pin_memory=True)
-
-    test_loader = DataLoader(
-        Preprocessor(list(set(dataset.query) | set(dataset.gallery)),
-                     root=dataset.images_dir, transform=test_transformer),
-        batch_size=batch_size, num_workers=workers,
-        shuffle=False, pin_memory=True)
-
-    return dataset, num_classes, train_loader, val_loader, test_loader
-
-
-def bbox_data(data_dir, height, width, batch_size, workers):
+def bbox_data(img_dir, height, width, batch_size, workers):
     normalizer = T.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225])
 
@@ -94,7 +48,7 @@ def bbox_data(data_dir, height, width, batch_size, workers):
         normalizer,
     ])
 
-    test_loader = DataLoader(PoseDetectionFolder(data_dir, input_transform=test_transformer), batch_size=batch_size,
+    test_loader = DataLoader(PoseDetectionFolder(img_dir, input_transform=test_transformer), batch_size=batch_size,
                              num_workers=workers, shuffle=False, pin_memory=True)
 
     return test_loader
@@ -117,11 +71,6 @@ def main(args):
     if args.height is None or args.width is None:
         args.height, args.width = (144, 56) if args.arch == 'inception' else \
             (256, 128)
-
-    dataset, num_classes, train_loader, val_loader, test_loader = \
-        get_data(args.dataset, args.split, args.data_dir, args.height,
-                 args.width, args.batch_size, args.num_instances, args.workers,
-                 args.combine_trainval)
 
     # Create model
     # Hacking here to let the classifier be the last feature embedding layer
@@ -151,55 +100,37 @@ def main(args):
     # Evaluator
     evaluator = Evaluator(model)
     if args.evaluate:
-        img_dir = "/home/jinsheng/PoseTrack/data/bonn-multiperson-posetrack/detections_img_unresized/000001"
         metric.train(model, train_loader)
         print("Test:")
-        test_loader = bbox_data(img_dir, args.height, args.width, args.batch_size, args.workers)
-        dist = evaluator.bbox_evaluate(test_loader, metric)
-        print(dist)
-        # evaluator.evaluate(test_loader, dataset.query, dataset.gallery, metric)
+        data_dir = args.data_dir
+
+        for i, dir_name in enumerate(os.listdir(data_dir)):
+            start_time = time.time()
+            img_dir = os.path.join(data_dir, dir_name)
+            if not os.path.isdir(img_dir):
+                continue
+
+            test_loader = bbox_data(img_dir, args.height, args.width, args.batch_size, args.workers)
+            dist = evaluator.bbox_evaluate(test_loader, metric, args.use_cos)
+            dist = to_numpy(dist)
+
+            save_file = os.path.join(args.save_dir, dir_name)
+            scio.savemat(save_file, {'diff': dist})
+            end_time = time.time()
+            print('Calculate: {} [{}/{}].\t'
+                  'Shape: {} * {}\t'
+                  'Time: {}'
+                  .format(dir_name, i + 1, *dist.shape, end_time - start_time))
         return
 
-    # Criterion
-    criterion = TripletLoss(margin=args.margin).cuda()
 
-    # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
-                                 weight_decay=args.weight_decay)
-
-    # Trainer
-    trainer = Trainer(model, criterion)
-
-    # Schedule learning rate
-    def adjust_lr(epoch):
-        lr = args.lr if epoch <= 100 else \
-            args.lr * (0.001 ** ((epoch - 100) / 50.0))
-        for g in optimizer.param_groups:
-            g['lr'] = lr * g.get('lr_mult', 1)
-
-    # Start training
-    for epoch in range(start_epoch, args.epochs):
-        adjust_lr(epoch)
-        trainer.train(epoch, train_loader, optimizer)
-        top1 = evaluator.evaluate(val_loader, dataset.val, dataset.val)
-
-        is_best = top1 > best_top1
-        best_top1 = max(top1, best_top1)
-        save_checkpoint({
-            'state_dict': model.module.state_dict(),
-            'epoch': epoch + 1,
-            'best_top1': best_top1,
-        }, is_best, fpath=osp.join(args.logs_dir, 'checkpoint.pth.tar'))
-
-        print('\n * Finished epoch {:3d}  top1: {:5.1%}  best: {:5.1%}{}\n'.
-              format(epoch, top1, best_top1, ' *' if is_best else ''))
-
-    # Final test
-    print('Test with best model:')
-    checkpoint = load_checkpoint(osp.join(args.logs_dir, 'model_best.pth.tar'))
-    model.module.load_state_dict(checkpoint['state_dict'])
-    metric.train(model, train_loader)
-    evaluator.evaluate(test_loader, dataset.query, dataset.gallery, metric)
+def to_numpy(tensor):
+    if torch.is_tensor(tensor):
+        return tensor.cpu().numpy()
+    elif type(tensor).__module__ != 'numpy':
+        raise ValueError("Cannot convert {} to numpy array"
+                         .format(type(tensor)))
+    return tensor
 
 
 if __name__ == '__main__':
@@ -246,10 +177,14 @@ if __name__ == '__main__':
     # metric learning
     parser.add_argument('--dist-metric', type=str, default='euclidean',
                         choices=['euclidean', 'kissme'])
+    parser.add_argument('--use-cos', type=str, default='y',
+                        choices=['y', 'n'])
     # misc
     working_dir = osp.dirname(osp.abspath(__file__))
     parser.add_argument('--data-dir', type=str, metavar='PATH',
                         default=osp.join(working_dir, 'data'))
     parser.add_argument('--logs-dir', type=str, metavar='PATH',
                         default=osp.join(working_dir, 'logs'))
+    parser.add_argument('--save-dir', type=str, metavar='PATH',
+                        default=osp.join(working_dir, 'dets'))
     main(parser.parse_args())
