@@ -111,7 +111,7 @@ def main(args):
         print("Extract features for each proposal:")
         data_dir = args.data_dir
         num_dirs = len(os.listdir(data_dir))
-        for i, video_name in enumerate(os.listdir(data_dir)):
+        for i, video_name in enumerate(sorted(os.listdir(data_dir), key=key)):
             video_proposals_dir = os.path.join(data_dir, video_name)
             if not os.path.isdir(video_proposals_dir):
                 continue
@@ -122,7 +122,7 @@ def main(args):
             os.mkdir(save_feature_dir)
 
             num_frames = len(os.listdir(video_proposals_dir))
-            for j, frame_name in enumerate(os.listdir(video_proposals_dir)):
+            for j, frame_name in enumerate(sorted(os.listdir(video_proposals_dir), key=key)):
                 img_dir = os.path.join(video_proposals_dir, frame_name)
                 if not os.path.isdir(img_dir):
                     continue
@@ -151,6 +151,10 @@ def to_numpy(tensor):
         raise ValueError("Cannot convert {} to numpy array"
                          .format(type(tensor)))
     return tensor
+
+
+def key(x):
+    return int(os.path.splitext(x)[0])
 
 
 if __name__ == '__main__':
