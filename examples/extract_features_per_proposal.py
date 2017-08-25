@@ -137,8 +137,10 @@ def main(args):
                 end_time = time.time()
                 print('Calculate: {:10} [{:4}/{:<4}].\t'
                       'Frames: [{:4}/{:<4}]\t'
+                      'Shape: {:<4} * {:4}'
                       'Time: {:.3f}'
-                      .format(video_name, i + 1, num_dirs, j + 1, num_frames, end_time - start_time))
+                      .format(video_name, i + 1, num_dirs, j + 1, num_frames, *features_mat.shape,
+                              end_time - start_time))
         return
 
 
