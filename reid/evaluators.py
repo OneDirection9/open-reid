@@ -124,6 +124,7 @@ def probability(features):
 
     return cos_
 
+
 def evaluate_all(distmat, query=None, gallery=None,
                  query_ids=None, gallery_ids=None,
                  query_cams=None, gallery_cams=None,
@@ -185,3 +186,11 @@ class Evaluator(object):
         else:
             distmat = pairwise_distance(features, None, None, metric=metric)
         return distmat
+
+    def extract_proposal_features(self, data_loader):
+        features, _ = extract_bbox_features(self.model, data_loader)
+        n = len(features)
+
+        features_ = torch.cat(list(features.values()))
+        features_ = features_.view(n, -1)
+        return features_
