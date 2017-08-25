@@ -123,9 +123,11 @@ def main(args):
 
             num_frames = len(os.listdir(video_proposals_dir))
             for j, frame_name in enumerate(os.listdir(video_proposals_dir)):
-                start_time = time.time()
-
                 img_dir = os.path.join(video_proposals_dir, frame_name)
+                if not os.path.isdir(img_dir):
+                    continue
+
+                start_time = time.time()
                 test_loader = bbox_data(img_dir, args.height, args.width, args.batch_size, args.workers)
                 features_ = evaluator.extract_proposal_features(test_loader)
                 features_mat = to_numpy(features_)
