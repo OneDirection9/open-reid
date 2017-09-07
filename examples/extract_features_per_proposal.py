@@ -111,7 +111,7 @@ def main(args):
         print("Extract features for each proposal:")
         data_dir = args.data_dir
         num_dirs = len(os.listdir(data_dir))
-        for i, video_name in enumerate(sorted(os.listdir(data_dir), key=key)):
+        for i, video_name in enumerate(os.listdir(data_dir)):
             video_proposals_dir = os.path.join(data_dir, video_name)
             if not os.path.isdir(video_proposals_dir):
                 continue
